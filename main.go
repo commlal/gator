@@ -67,6 +67,7 @@ func main() {
 	commands := commands{cmdMap: make(map[string]func(*state, command) error)}
 	commands.register("login", handlerLogin)
 	commands.register("register", handlerRegister)
+	commands.register("reset", handlerReset)
 
 	//Running Commands
 	CLIargs := os.Args
@@ -92,20 +93,21 @@ func handlerLogin(s *state, cmd command) error {
 		log.Print(color.RedString("ERROR -- No Username submitted"))
 		return errors.New("Username can not be empty")
 	}
+	userName := cmd.args[0]
 	//Check user is in database
-	log.Printf(color.MagentaString("DEBUG -- Checking user: %v"), cmd.args[0])
-	_, err := s.db.GetUserByName(context.Background(), cmd.args[0])
+
+	_, err := s.db.GetUserByName(context.Background(), userName)
 	if err != nil {
-		log.Printf(color.RedString("ERROR -- User not in database: %v"), cmd.args[0])
+		log.Printf(color.RedString("ERROR -- User not in database: %v"), userName)
 		return errors.New(fmt.Sprintf("User not in database: %v"))
 	}
 
-	err = s.cfg.SetUser(cmd.args[0])
+	err = s.cfg.SetUser(userName)
 	if err != nil {
-		log.Printf(color.RedString("ERROR -- Unable to set %v as active user", cmd.args[0]))
-		return errors.New(fmt.Sprintf("Unable to set %v as active user", cmd.args[0]))
+		log.Printf(color.RedString("ERROR -- Unable to set %v as active user", userName))
+		return errors.New(fmt.Sprintf("Unable to set %v as active user", userName))
 	}
-	fmt.Printf(color.GreenString("User set to %v\n", cmd.args[0]))
+	fmt.Printf(color.GreenString("AUTHENTICATION -- User set to %v\n", userName))
 	return nil
 }
 
@@ -114,24 +116,36 @@ func handlerRegister(s *state, cmd command) error {
 		log.Print(color.RedString("ERROR -- No Username submitted"))
 		return errors.New("Username can not be empty")
 	}
+	userName := cmd.args[0]
 	//Check if user already exists in database
-	log.Printf(color.MagentaString("DEBUG -- Checking user: %v"), cmd.args[0])
-	_, err := s.db.GetUserByName(context.Background(), cmd.args[0])
+
+	_, err := s.db.GetUserByName(context.Background(), userName)
 	if err == nil {
-		log.Printf(color.RedString("ERROR -- User already exists: %v"), cmd.args[0])
+		log.Printf(color.RedString("ERROR -- User already exists: %v"), userName)
 		return errors.New(fmt.Sprintf("User already exists: %v"))
 	}
 
 	//Register new user
-	_, err = s.db.CreateUser(context.Background(), cmd.args[0])
+	_, err = s.db.CreateUser(context.Background(), userName)
 	if err != nil {
-		log.Printf(color.RedString("ERROR -- Could not create user %v: %v"), cmd.args[0], err)
+		log.Printf(color.RedString("ERROR -- Could not create user %v: %v"), userName, err)
 		return errors.New("Error creating new user")
 	}
-	err = s.cfg.SetUser(cmd.args[0])
+	err = s.cfg.SetUser(userName)
 	if err != nil {
-		log.Printf(color.RedString("ERROR -- Unable to set newly registered %v as active user", cmd.args[0]))
-		return errors.New(fmt.Sprintf("Unable to set newly registered %v as active user", cmd.args[0]))
+		log.Printf(color.RedString("ERROR -- Unable to set newly registered %v as active user", userName))
+		return errors.New(fmt.Sprintf("Unable to set newly registered %v as active user", userName))
 	}
+	log.Print(color.CyanString("DATABASE -- User Created: %v", userName))
+	return nil
+}
+
+func handlerReset(s *state, cmd command) error {
+	err := s.db.PurgeUsers(context.Background())
+	if err != nil {
+		log.Print(color.RedString("ERROR -- Could not reset user database: %v"))
+		return errors.New("Error resetting database")
+	}
+	log.Print(color.CyanString("DATABASE -- Database Reset"))
 	return nil
 }

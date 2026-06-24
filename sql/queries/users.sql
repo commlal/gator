@@ -11,3 +11,6 @@ RETURNING *;
 -- name: GetUserByName :one
 SELECT id FROM users
 WHERE name = $1;
+
+-- name: PurgeUsers :exec
+DELETE FROM users;

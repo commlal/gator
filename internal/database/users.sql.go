@@ -45,3 +45,12 @@ func (q *Queries) GetUserByName(ctx context.Context, name string) (uuid.UUID, er
 	err := row.Scan(&id)
 	return id, err
 }
+
+const purgeUsers = `-- name: PurgeUsers :exec
+DELETE FROM users
+`
+
+func (q *Queries) PurgeUsers(ctx context.Context) error {
+	_, err := q.db.ExecContext(ctx, purgeUsers)
+	return err
+}
