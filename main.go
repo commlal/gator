@@ -52,7 +52,7 @@ func main() {
 	if err != nil {
 		log.Fatalf(color.RedString("ERROR -- Error reading config: %v", err))
 	}
-	fmt.Printf(color.GreenString("Config Initiated: %+v\n", c))
+	fmt.Printf(color.GreenString("Config Initiated: %+v\n", c.CurrentUserName))
 	
 
 	//Connect to database
@@ -68,6 +68,7 @@ func main() {
 	commands.register("login", handlerLogin)
 	commands.register("register", handlerRegister)
 	commands.register("reset", handlerReset)
+	commands.register("users", handlerUsers)
 
 	//Running Commands
 	CLIargs := os.Args
@@ -147,5 +148,24 @@ func handlerReset(s *state, cmd command) error {
 		return errors.New("Error resetting database")
 	}
 	log.Print(color.CyanString("DATABASE -- Database Reset"))
+	return nil
+}
+
+func handlerUsers(s *state, cmd command) error {
+	log.Print(color.CyanString("DATABASE -- Listing all users"))
+	userList, err := s.db.GetAllUsers(context.Background())
+	if err != nil {
+		log.Print(color.RedString("ERROR -- Could not access full user list: %v"))
+		return errors.New("Error retrieving user database")
+	}
+
+	for _, name := range userList {
+		if name == s.cfg.CurrentUserName {
+			fmt.Printf("%s (current)\n", name)
+		} else {
+			fmt.Println(name)
+		}
+		
+	}
 	return nil
 }
