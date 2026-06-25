@@ -69,6 +69,7 @@ func main() {
 	commands.register("register", handlerRegister)
 	commands.register("reset", handlerReset)
 	commands.register("users", handlerUsers)
+	commands.register("agg", handlerAgg)
 
 	//Running Commands
 	CLIargs := os.Args
@@ -167,5 +168,19 @@ func handlerUsers(s *state, cmd command) error {
 		}
 		
 	}
+	return nil
+}
+
+func handlerAgg(s *state, cmd command) error {
+	feedURL := "https://www.wagslane.dev/index.xml"
+	log.Print(color.YellowString("RSS -- Attepting to pull RSS Feeds"))
+
+	
+	rssFeed, err := fetchFeed(context.Background(), feedURL)
+	if err != nil {
+		log.Print(color.RedString("ERROR -- Unable to retrieve RSS"))
+		return errors.New("Error retrieving RSS Feed")
+	}
+	fmt.Printf(color.YellowString("RSS FEED: %v \n", rssFeed))
 	return nil
 }
