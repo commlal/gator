@@ -13,7 +13,16 @@ import (
 	"context"
 
 )
+/*Log Messages
 
+Yellow 	FEED
+Magenta	DEBUG
+Green	AUTHENTICATION
+Red		ERROR
+Cyan	DATABASE
+Blue	----
+
+*/
 type state struct {
 	cfg	*config.Config
 	db	*database.Queries
@@ -52,9 +61,8 @@ func main() {
 	if err != nil {
 		log.Fatalf(color.RedString("ERROR -- Error reading config: %v", err))
 	}
-	fmt.Printf(color.GreenString("Config Initiated: %+v\n", c.CurrentUserName))
+	log.Printf(color.GreenString("AUTHENTICATION -- Loggedin User: %+v", c.CurrentUserName))
 	
-
 	//Connect to database
 	db, err := sql.Open("postgres", c.DBURL)
 	if err != nil {
@@ -70,6 +78,7 @@ func main() {
 	commands.register("reset", handlerReset)
 	commands.register("users", handlerUsers)
 	commands.register("agg", handlerAgg)
+	commands.register("addfeed", handlerAddFeed)
 
 	//Running Commands
 	CLIargs := os.Args
@@ -182,5 +191,38 @@ func handlerAgg(s *state, cmd command) error {
 		return errors.New("Error retrieving RSS Feed")
 	}
 	fmt.Printf(color.YellowString("RSS FEED: %v \n", rssFeed))
+	return nil
+}
+
+func handlerAddFeed(s *state, cmd command) error {
+	if len(cmd.args) == 0 || len(cmd.args) == 1 {
+		log.Print(color.RedString("ERROR -- Missing either feed name or URL"))
+		return errors.New("Missing either feed name or URL")
+	}
+	feedName := cmd.args[0]
+	feedURL := cmd.args[1]
+	currentUser := s.cfg.CurrentUserName
+	userID, err := s.db.GetUserByName(context.Background(), currentUser)
+	if err != nil {
+		log.Print(color.RedString("ERROR -- User %v not found in database", currentUser))
+		log.Print(color.RedString("ERROR -- Error information: %v", err))
+		return errors.New(fmt.Sprintf("User %v not found in database", currentUser))
+	}
+
+	log.Printf(color.GreenString("AUTHENTICATION -- %s User ID: %v"), currentUser, userID)
+
+	CreateFeedParams := database.CreateFeedParams{
+		Name:   feedName,
+		Url:    feedURL,
+		UserID: userID,
+		}
+	
+	createdFeed, err := s.db.CreateFeed(context.Background(), CreateFeedParams)
+	if err != nil {
+		log.Print(color.RedString("ERROR -- Feed already in database:", err))
+		return errors.New(fmt.Sprintf("Feed for URL %v already in database", feedURL))
+	}
+	log.Printf(color.YellowString("FEED -- %s added %s(URL:%s) feed to database"), currentUser, feedName, feedURL)
+	fmt.Printf("%v", createdFeed)
 	return nil
 }
