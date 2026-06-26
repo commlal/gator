@@ -61,7 +61,7 @@ func main() {
 	if err != nil {
 		log.Fatalf(color.RedString("ERROR -- Error reading config: %v", err))
 	}
-	log.Printf(color.GreenString("AUTHENTICATION -- Loggedin User: %+v", c.CurrentUserName))
+	//log.Printf(color.GreenString("AUTHENTICATION -- Loggedin User: %+v", c.CurrentUserName))
 	
 	//Connect to database
 	db, err := sql.Open("postgres", c.DBURL)
@@ -79,6 +79,7 @@ func main() {
 	commands.register("users", handlerUsers)
 	commands.register("agg", handlerAgg)
 	commands.register("addfeed", handlerAddFeed)
+	commands.register("feeds", handlerListFeeds)
 
 	//Running Commands
 	CLIargs := os.Args
@@ -224,5 +225,27 @@ func handlerAddFeed(s *state, cmd command) error {
 	}
 	log.Printf(color.YellowString("FEED -- %s added %s(URL:%s) feed to database"), currentUser, feedName, feedURL)
 	fmt.Printf("%v", createdFeed)
+	return nil
+}
+
+func handlerListFeeds(s *state, cmd command) error {
+	log.Print(color.CyanString("DATABASE -- Listing all feeds"))
+
+	feedList, err := s.db.ListAllFeeds(context.Background())
+		if err != nil {
+		log.Print(color.RedString("ERROR -- Unable to pull list of feeds from database"))
+		return errors.New("Unable to pull list of feeds from database")
+	}
+
+	for i, feed := range feedList {
+		userName, err := s.db.GetUserByID(context.Background(), feed.UserID)
+		if err != nil {
+		log.Print(color.RedString("ERROR -- Invalid User ID:", err))
+		}
+		fmt.Printf("FEED %v\n", i)
+		fmt.Printf("BLOG TITLE: %s\n", feed.Name)
+		fmt.Printf("BLOG URL: %s\n", feed.Url)
+		fmt.Printf("ADDED BY: %s\n\n", userName)
+	}
 	return nil
 }
