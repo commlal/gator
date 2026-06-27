@@ -70,6 +70,9 @@ func main() {
 	dbQueries := database.New(db)
 	s := state{cfg: &c, db: dbQueries}
 
+	cl := color.New(color.BgHiGreen).Add(color.FgBlack)
+	cl.Println("Welcome to Gator - The Golang Blog Aggregator")
+
 	//Registering available handler functions
 	commands := commands{cmdMap: make(map[string]func(*state, command) error)}
 	commands.register("login", handlerLogin)
@@ -82,6 +85,7 @@ func main() {
 	commands.register("addfeed", middlewareLoggedIn(handlerAddFeed))
 	commands.register("follow", middlewareLoggedIn(handlerFollowFeed))
 	commands.register("following", middlewareLoggedIn(handlerUserFollows))
+	commands.register("unfollow", middlewareLoggedIn(handlerUserUnfollows))
 
 	//Running Commands
 	CLIargs := os.Args
@@ -217,7 +221,7 @@ func handlerAddFeed(s *state, cmd command, user database.User) error {
 		log.Print(color.RedString("ERROR -- Feed already in database:", err))
 		return errors.New(fmt.Sprintf("Feed for URL %v already in database", feedURL))
 	}
-	//Integrated the feed follow functionality 
+
 	CreateFeedFollowParams :=  database.CreateFeedFollowParams{
 		UserID: user.ID,
 		FeedID: createdFeed.ID,
@@ -293,4 +297,3 @@ func handlerUserFollows(s *state, cmd command, user database.User) error {
 	}
 	return nil
 }
-

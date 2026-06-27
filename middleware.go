@@ -1,7 +1,6 @@
 package main
 
 import (
-	//"github.com/commlal/gator/internal/config"
 	"github.com/commlal/gator/internal/database"
 	"github.com/fatih/color"
 	"log"
@@ -11,7 +10,7 @@ import (
 
 type loggedInHandler func(s *state, cmd command, user database.User) error
 
-func middlewareLoggedIn(f loggedInHandler) func(*state, command) error {
+func middlewareLoggedIn(newfunc loggedInHandler) func(*state, command) error {
 	return func(s *state, cmd command) error {
 		if s.cfg.CurrentUserName == "" {
 			log.Print(color.RedString("ERROR -- No user logged in to this restricted function"))
@@ -22,6 +21,6 @@ func middlewareLoggedIn(f loggedInHandler) func(*state, command) error {
 			log.Printf(color.RedString("ERROR -- User not in database. Unable to use %s", cmd))
 			return errors.New("User not in database.")
 		}
-		return f(s, cmd, user)
+		return newfunc(s, cmd, user)
 	}
 }
