@@ -11,7 +11,6 @@ import (
 	"database/sql"
 	_ "github.com/lib/pq"
 	"context"
-
 )
 /*Log Messages
 
@@ -80,6 +79,8 @@ func main() {
 	commands.register("agg", handlerAgg)
 	commands.register("addfeed", handlerAddFeed)
 	commands.register("feeds", handlerListFeeds)
+	commands.register("follow", handlerFollowFeed)
+	commands.register("following", handlerUserFollows)
 
 	//Running Commands
 	CLIargs := os.Args
@@ -202,6 +203,7 @@ func handlerAddFeed(s *state, cmd command) error {
 	}
 	feedName := cmd.args[0]
 	feedURL := cmd.args[1]
+	
 	currentUser := s.cfg.CurrentUserName
 	userID, err := s.db.GetUserByName(context.Background(), currentUser)
 	if err != nil {
@@ -209,7 +211,6 @@ func handlerAddFeed(s *state, cmd command) error {
 		log.Print(color.RedString("ERROR -- Error information: %v", err))
 		return errors.New(fmt.Sprintf("User %v not found in database", currentUser))
 	}
-
 	log.Printf(color.GreenString("AUTHENTICATION -- %s User ID: %v"), currentUser, userID)
 
 	CreateFeedParams := database.CreateFeedParams{
@@ -223,8 +224,19 @@ func handlerAddFeed(s *state, cmd command) error {
 		log.Print(color.RedString("ERROR -- Feed already in database:", err))
 		return errors.New(fmt.Sprintf("Feed for URL %v already in database", feedURL))
 	}
-	log.Printf(color.YellowString("FEED -- %s added %s(URL:%s) feed to database"), currentUser, feedName, feedURL)
-	fmt.Printf("%v", createdFeed)
+	//Integrated the feed follow functionality 
+	CreateFeedFollowParams :=  database.CreateFeedFollowParams{
+		UserID: userID,
+		FeedID: createdFeed.ID,
+	}
+	followResults, err := s.db.CreateFeedFollow(context.Background(), CreateFeedFollowParams)
+	if err != nil {
+		log.Printf(color.RedString("ERROR -- User %s already follows this blog"), s.cfg.CurrentUserName)
+		return errors.New(fmt.Sprintf("User %s already follows this blog", s.cfg.CurrentUserName))
+	}
+
+	log.Printf(color.YellowString("FEED -- %s added %s(URL:%s) feed to database"), followResults.UserName, followResults.FeedName, feedURL)
+	//fmt.Printf("%v", createdFeed)
 	return nil
 }
 
@@ -232,7 +244,7 @@ func handlerListFeeds(s *state, cmd command) error {
 	log.Print(color.CyanString("DATABASE -- Listing all feeds"))
 
 	feedList, err := s.db.ListAllFeeds(context.Background())
-		if err != nil {
+	if err != nil {
 		log.Print(color.RedString("ERROR -- Unable to pull list of feeds from database"))
 		return errors.New("Unable to pull list of feeds from database")
 	}
@@ -246,6 +258,61 @@ func handlerListFeeds(s *state, cmd command) error {
 		fmt.Printf("BLOG TITLE: %s\n", feed.Name)
 		fmt.Printf("BLOG URL: %s\n", feed.Url)
 		fmt.Printf("ADDED BY: %s\n\n", userName)
+	}
+	return nil
+}
+
+func handlerFollowFeed(s *state, cmd command) error {
+	if len(cmd.args) == 0 {
+		log.Print(color.RedString("ERROR -- Missing feed URL"))
+		return errors.New("Missing feed URL")
+	}
+
+	feedURL := cmd.args[0]
+	feedID, err := s.db.GetFeedByURL(context.Background(), feedURL)
+	if err != nil {
+		log.Print(color.RedString("ERROR -- Feed not found in feed database - use addfeed to add blog to gator!"))
+		return errors.New("Feed not found in feed database - use addfeed to add blog to gator!")
+	}
+
+	userID, err := s.db.GetUserByName(context.Background(), s.cfg.CurrentUserName)
+	if err != nil {
+		log.Printf(color.RedString("ERROR -- User not in database: %v"), s.cfg.CurrentUserName)
+		return errors.New(fmt.Sprintf("User not in database: %v", s.cfg.CurrentUserName))
+	}
+
+	CreateFeedFollowParams :=  database.CreateFeedFollowParams{
+		UserID: userID,
+		FeedID: feedID.ID,
+	}
+
+	followResults, err := s.db.CreateFeedFollow(context.Background(), CreateFeedFollowParams)
+	if err != nil {
+		log.Printf(color.RedString("ERROR -- User %s already follows this blog"), s.cfg.CurrentUserName)
+		return errors.New(fmt.Sprintf("User %s already follows this blog", s.cfg.CurrentUserName))
+	}
+
+	fmt.Printf(color.YellowString("NEW FEED FOLLOW CREATED\n Blog: %s \n User: %s\n", followResults.FeedName, followResults.UserName))
+	log.Printf(color.YellowString("FEED -- New Feed Follow Created: User %s, Blog %s"), followResults.UserName, followResults.FeedName)
+	return nil
+}
+
+func handlerUserFollows(s *state, cmd command) error {
+	userName := s.cfg.CurrentUserName
+	userID, err := s.db.GetUserByName(context.Background(), userName)
+	if err != nil {
+		log.Printf(color.RedString("ERROR -- User not in database: %v"), userName)
+		return errors.New(fmt.Sprintf("User not in database: %v", userName))
+	}
+
+	feedList, err := s.db.GetFeedFollowsForUser(context.Background(), userID)
+	if err != nil {
+		log.Printf(color.RedString("ERROR -- Issue retrieving follows for user: %v"), userName)
+		return errors.New(fmt.Sprintf("Issue retrieving follows for user: %v", userName))
+	}
+	fmt.Printf(color.CyanString("DATABASE -- User %s follows:\n", userName))
+	for _, feed := range feedList {
+		fmt.Printf("%s\n", feed.FeedName)
 	}
 	return nil
 }
