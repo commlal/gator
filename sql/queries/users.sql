@@ -9,7 +9,7 @@ VALUES (
 RETURNING *;
 
 -- name: GetUserByName :one
-SELECT id FROM users
+SELECT * FROM users
 WHERE name = $1;
 
 -- name: PurgeUsers :exec

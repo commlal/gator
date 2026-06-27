@@ -74,15 +74,20 @@ func (q *Queries) GetUserByID(ctx context.Context, id uuid.UUID) (string, error)
 }
 
 const getUserByName = `-- name: GetUserByName :one
-SELECT id FROM users
+SELECT id, created_at, updated_at, name FROM users
 WHERE name = $1
 `
 
-func (q *Queries) GetUserByName(ctx context.Context, name string) (uuid.UUID, error) {
+func (q *Queries) GetUserByName(ctx context.Context, name string) (User, error) {
 	row := q.db.QueryRowContext(ctx, getUserByName, name)
-	var id uuid.UUID
-	err := row.Scan(&id)
-	return id, err
+	var i User
+	err := row.Scan(
+		&i.ID,
+		&i.CreatedAt,
+		&i.UpdatedAt,
+		&i.Name,
+	)
+	return i, err
 }
 
 const purgeUsers = `-- name: PurgeUsers :exec
