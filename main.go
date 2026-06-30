@@ -11,6 +11,7 @@ import (
 	"database/sql"
 	_ "github.com/lib/pq"
 	"context"
+	"time"
 )
 /*Log Messages
 
@@ -172,7 +173,7 @@ func handlerUsers(s *state, cmd command) error {
 	log.Print(color.CyanString("DATABASE -- Listing all users"))
 	userList, err := s.db.GetAllUsers(context.Background())
 	if err != nil {
-		log.Print(color.RedString("ERROR -- Could not access full user list: %v"))
+		log.Printf(color.RedString("ERROR -- Could not access full user list: %v", err))
 		return errors.New("Error retrieving user database")
 	}
 
@@ -188,17 +189,43 @@ func handlerUsers(s *state, cmd command) error {
 }
 
 func handlerAgg(s *state, cmd command) error {
-	feedURL := "https://www.wagslane.dev/index.xml"
-	log.Print(color.YellowString("RSS -- Attepting to pull RSS Feeds"))
-
-	
-	rssFeed, err := fetchFeed(context.Background(), feedURL)
-	if err != nil {
-		log.Print(color.RedString("ERROR -- Unable to retrieve RSS"))
-		return errors.New("Error retrieving RSS Feed")
+	//Getting time from argument and parsing it
+	if len(cmd.args) == 0 {
+		log.Print(color.RedString("ERROR -- Missing duration value"))
+		return errors.New("Missing duration value")
 	}
-	fmt.Printf(color.YellowString("RSS FEED: %v \n", rssFeed))
+	timeString := cmd.args[0]
+	timebetweenreqs, err := time.ParseDuration(timeString)
+	
+	if err != nil {
+		log.Print(color.RedString("ERROR -- Invalid time submitted: %v", err))
+		return errors.New("Invalid time submitted")
+	}
+	log.Print(color.MagentaString("DEBUG -- Aggregator set to %v", timebetweenreqs))
+
+
+	//User notification ticker
+	go helperUserNotification()
+
+	//Start aggrigation loop
+	ticker := time.NewTicker(timebetweenreqs)
+	log.Print(color.MagentaString("DEBUG -- Starting Agg Loop!"))
+	for ; ; <-ticker.C {
+		err = scrapeFeed(s, context.Background())
+		if err != nil {
+			log.Print(color.RedString("ERROR -- Error in scrapeFeed function: %v", err))
+			return errors.New("Error in scrapeFeed function")
+		}
+	}
 	return nil
+}
+
+func helperUserNotification() {
+		noticeTicker := time.NewTicker(1 * time.Minute)
+		for ; ; <- noticeTicker.C {
+			fmt.Println(color.YellowString("RSS -- Collecting feeds..."))
+		}
+	return
 }
 
 func handlerAddFeed(s *state, cmd command, user database.User) error {
@@ -294,6 +321,31 @@ func handlerUserFollows(s *state, cmd command, user database.User) error {
 	fmt.Printf(color.CyanString("DATABASE -- User %s follows:\n", user.Name))
 	for _, feed := range feedList {
 		fmt.Printf("%s\n", feed.FeedName)
+	}
+	return nil
+}
+
+func handlerUserUnfollows(s *state, cmd command, user database.User) error {
+	if len(cmd.args) == 0 {
+		log.Print(color.RedString("ERROR -- Missing feed URL"))
+		return errors.New("Missing feed URL")
+	}
+
+	feedURL := cmd.args[0]
+
+	feedData, err := s.db.GetFeedByURL(context.Background(), feedURL) //returns Feed struct
+	if err != nil {
+		log.Print(color.RedString("ERROR -- Feed not found in feed database"))
+		return errors.New("Feed not found in feed database")
+	}
+	deleteFeed := database.DeleteFeedFollowParams{
+		UserID: user.ID,
+		FeedID: feedData.ID,
+	}
+	err = s.db.DeleteFeedFollow(context.Background(), deleteFeed)
+	if err != nil {
+		log.Print(color.RedString("ERROR -- User is not following feed"))
+		return errors.New("User is not following feed")
 	}
 	return nil
 }

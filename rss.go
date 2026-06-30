@@ -32,7 +32,6 @@ func fetchFeed(ctx context.Context, feedURL string) (*RSSFeed, error) {
 	//Make GET request to feedURL to retrieve XML
 	compiledRSS := RSSFeed{}
 	
-	
 	req, err := http.NewRequestWithContext(ctx, "GET", feedURL, nil)
 	if err != nil {
 		log.Printf(color.RedString("ERROR -- Unable to generate request to: %s", feedURL))
@@ -61,7 +60,6 @@ func fetchFeed(ctx context.Context, feedURL string) (*RSSFeed, error) {
 		return nil, errors.New(fmt.Sprintf("ERROR -- Unable to parse XML data: %v", err))
 	}
 
-
 	compiledRSS.Channel.Title = html.UnescapeString(compiledRSS.Channel.Title)
 	compiledRSS.Channel.Description = html.UnescapeString(compiledRSS.Channel.Description)
 	
@@ -70,6 +68,38 @@ func fetchFeed(ctx context.Context, feedURL string) (*RSSFeed, error) {
 		compiledRSS.Channel.Item[i].Description = html.UnescapeString(item.Description)
 	}
 
-
 	return &compiledRSS, nil
+}
+
+func scrapeFeed (s *state, ctx context.Context) error {
+	//Get the next feed to fetch from database
+	nextFeedData , err := s.db.GetNextFeedToFetch(context.Background()) //URL is nextFeedData.Url, ID is nextFeedData.ID
+	if err != nil {
+		log.Printf(color.RedString("ERROR -- Unable to obtain next feed from database: %v", err))
+		return errors.New(fmt.Sprintf("ERROR -- Unable to obtain next feed from database: %v", err))
+	}
+	log.Printf(color.YellowString("RSS -- Next blog to fetch is %s from %s", nextFeedData.Name, nextFeedData.Url))
+	log.Printf(color.YellowString("RSS -- Last Fetched: %v", nextFeedData.LastFetchedAt))
+
+	//Mark it as fetched
+	err = s.db.MarkFeedFetched(context.Background(), nextFeedData.ID)
+	if err != nil {
+		log.Printf(color.RedString("ERROR -- Unable to mark the feed (URL:%s) as 'fetched': %v", nextFeedData.Name, err))
+		return errors.New(fmt.Sprintf("ERROR -- Unable to mark the feed (URL:%s) as 'fetched': %v", nextFeedData.Name, err))
+	}
+	log.Print(color.YellowString("RSS -- Fetch time updated"))
+	
+	//Fetch the feed
+	rssFeed, err := fetchFeed(context.Background(), nextFeedData.Url)
+	if err != nil {
+		log.Printf(color.RedString("ERROR -- Unable to obtain next feed from database: %v", err))
+		return errors.New(fmt.Sprintf("ERROR -- Unable to obtain next feed from database: %v", err))
+	}
+	log.Printf(color.YellowString("RSS -- %s has been fetched. Processing data...", nextFeedData.Name))
+
+	//Iterate over items in feed and print titles
+	for _, entry := range rssFeed.Channel.Item {
+		fmt.Printf("%s\n", entry.Title)
+	}
+	return nil
 }
