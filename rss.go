@@ -10,6 +10,7 @@ import (
 	"errors"
 	"io"
 	"html"
+	"github.com/commlal/gator/internal/database"
 )
 
 type RSSFeed struct {
@@ -79,7 +80,6 @@ func scrapeFeed (s *state, ctx context.Context) error {
 		return errors.New(fmt.Sprintf("ERROR -- Unable to obtain next feed from database: %v", err))
 	}
 	log.Printf(color.YellowString("RSS -- Next blog to fetch is %s from %s", nextFeedData.Name, nextFeedData.Url))
-	log.Printf(color.YellowString("RSS -- Last Fetched: %v", nextFeedData.LastFetchedAt))
 
 	//Mark it as fetched
 	err = s.db.MarkFeedFetched(context.Background(), nextFeedData.ID)
@@ -97,9 +97,22 @@ func scrapeFeed (s *state, ctx context.Context) error {
 	}
 	log.Printf(color.YellowString("RSS -- %s has been fetched. Processing data...", nextFeedData.Name))
 
-	//Iterate over items in feed and print titles
+	//Save feed to database
 	for _, entry := range rssFeed.Channel.Item {
-		fmt.Printf("%s\n", entry.Title)
+		_, err := s.db.PostInDatabase(context.Background(), entry.Link)
+		if err == nil {
+			log.Printf(color.CyanString("DATABASE -- Post already in database: %v", cleanData(entry.Title)))
+		} else {
+			CreatePostParams := database.CreatePostParams{
+				Title:			cleanData(entry.Title),
+				Url:			entry.Link,
+				Description:	cleanData(entry.Description),
+				ToTimestamp:	entry.PubDate,
+				FeedID:       	nextFeedData.ID,
+			}
+			_, err = s.db.CreatePost(context.Background(), CreatePostParams)
+			fmt.Println(color.YellowString("RSS -- Added %s to database", cleanData(entry.Title)))
+		}
 	}
-	return nil
+		return nil
 }
