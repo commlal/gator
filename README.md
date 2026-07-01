@@ -34,3 +34,13 @@ unfollow <url>: Unfollows a feed as the current user
 agg: Ongoing looping function that fetches feed data
 browse <int>: Displays the most recent <int> posts that current user follows
 **CAUTION** reset: Delete all users and dependent data!
+
+### Future Improvements
+
+- Finish this README! Need to add instructions for database and goose
+- Add `setup` command if possible to allow user to not worry about spinning database up
+- A number of tiny bug fixes
+- Improve output of posts to the user
+- Filtering in `browse` to pull certain feeds (by keyword?)
+- API?
+- Probably plenty others
